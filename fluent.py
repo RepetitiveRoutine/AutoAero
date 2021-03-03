@@ -2,6 +2,7 @@ import os
 from os import path
 import glob
 import shutil
+import asyncio
 import multiprocessing
 from pathlib import Path
 import sys
@@ -9,9 +10,9 @@ import sys
 current_version = "Version 1.5"
 
 #### PATH TO ALL THE GENERIC FILES AND THE STUDY FOLDERS LOCATION ####
-STRAIGHT_JRNL_PATH = "lib\\generic.JOU"
+STRAIGHT_JRNL_PATH = "lib\\SS-GEN.jou"
 YAW_JRNL_PATH = "lib\\yaw.JOU"
-GEN_ENS_PATH = "lib\\gen_escript.py"
+GEN_ENS_PATH = "lib\\SS-POST.py"
 FILE_CONTAINING_STUDY = "study"
 threads = 0
 
@@ -22,15 +23,20 @@ J_SEARCH = ("SIM_NUM", "SCDOC")
 E_SEARCH = ("PATHTODAT", "PATHTOCAS", "SIM_NUM_SPEED", "SIM_DIRECTORY")
 
 #### USED IN GENERATING EACH PYTHON SCRIPT FROM THE GENERIC ONE
-GZ_LIST = [["\\solved-40KmH.cdat", "\\solved-40KmH.cas", "-40KmH"],
-           ["\\solved-60KmH.cdat", "\\solved-60KmH.cas", "-60KmH"],
-           ["\\solved-80KmH.cdat", "\\solved-80KmH.cas", "-80KmH"]]
+GZ_LIST = [["\\solved-11.11MS.cdat", "\\solved-11.11MS.cas", "-11.11MS"],
+           ["\\solved-16.67MS.cdat", "\\solved-16.67MS.cas", "-16.67MS"],
+           ["\\solved-22.22MS.cdat", "\\solved-22.22MS.cas", "-22.22MS"]]
 
 SPEEDS = ["\\40KmH", "\\60KmH", "\\80KmH"]
 NUM_CASES = 3
 
 #### STORES THE PATH TO EACH GENERATED ENSIGHT SCRIPT
 E_SCRIPTS = ["","",""]
+
+
+#### MULTIPLE SIM ARRAY ####
+SIMULATION_QUEUE = []
+
 
 ################################################################################
 
@@ -61,26 +67,89 @@ def launcher():
 ################################################################################
 
 def multiple_sim():
-
-    while(check_space_file() != None):
-        print("Yeah there is a scdoc")
-        input()
+    while(check_space_file() == True):
+        for file in os.listdir('.'):
+            if file.endswith(".scdoc"):
+                create_sims(file)
+                execute_sims()
 
 
 def check_space_file():
     scdocs = []
     for file in os.listdir('.'):
         if file.endswith(".scdoc"):
-            scdocs.append(file)
-
-    if(len(scdocs) == 0):
-        return None
-    else:
-        return 0
+            return True
+    return False
 
 ################################################################################
 
+def create_sims(file):
+    ui_multiple_sim(file)
+    sim_num = file.replace(".scdoc","")
+    filepath = sim_directory_setup(sim_num, file)
+    choice = input()
 
+    if (choice == 'S'):
+        sim = Simulation(sim_num, filepath, 'S')
+        path_to_journal = gen_SSJ(sim_num, filepath)
+        init_ensight(sim_num, filepath)
+        SIMULATION_QUEUE.append(sim)
+
+    elif (choice == 'Y'):
+        sim = Simulation(sim_num, filepath, 'Y')
+        path_to_journal = gen_SSJ(sim_num, filepath)
+        init_ensight(sim_num, filepath)
+        SIMULATION_QUEUE.append(sim)
+
+def ui_multiple_sim(file):
+    title()
+    print("Current queue = [", end = "")
+
+    for i in range(len(SIMULATION_QUEUE)):
+        print(SIMULATION_QUEUE[i].get_name(), end = "")
+        i += 1
+    print("]")
+    print("\nFILE FOUND: " + file)
+    print("            ", end = "")
+    for character in file:
+        print("¯", end ="")
+    print("\nIs this file Straight Line or Yaw? [S/Y]")
+
+
+
+################################################################################
+
+def straight_dir():
+    print()
+
+def yaw_dir():
+    print()
+
+def init_ensight(sim_num, filepath):
+    counter = 0
+    for gz in GZ_LIST:
+        E_SCRIPTS[counter] = ensight_file_setup(sim_num, filepath, gz[0], gz[1], gz[2])
+        counter += 1
+
+################################################################################
+
+# sim_directory_setup
+# Creates a root directory for the simulation you are going to run.
+# Returns the filepath.
+def multiple_directory_setup(sim_num, scdoc):
+    filepath = os.path.join(FILE_CONTAINING_STUDY, sim_num)
+    #If file is not already created
+    #TODO: Make program exit if file exists [Avoid overwrites]
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+
+    for speed in SPEEDS:
+        os.makedirs(filepath + "\\PostProcessing" + speed)
+
+    Path(scdoc).rename(filepath + "\\" + scdoc)
+    return filepath
+
+################################################################################
 
 def initialize_sim():
 
@@ -88,7 +157,7 @@ def initialize_sim():
     if(scdoc != None):
         sim_num = scdoc.replace(".scdoc","")
         path = sim_directory_setup(sim_num, scdoc)
-        path_to_journal = journal_file_setup(sim_num, path)
+        path_to_journal = gen_SSJ(sim_num, path)
 
         ## THIS IS DONE BEFORE OS.CHDIR SO THAT THE PROGRAM DOES NOT
         ## LOSE TRACK OF THE GENERIC PYTHON SCRIPT
@@ -99,12 +168,9 @@ def initialize_sim():
 
         #CD into the new directory
         os.chdir(path)
+        print(os.listdir("."))
         run_fluent(sim_num)
-
-        ## FOR EVERY SCRIPT WE JUST MADE, USE IT
-        for i in range(NUM_CASES):
-            ensight_pp(E_SCRIPTS[i])
-            mvFiles(SPEEDS[i])
+        run_ensight_scripts()
 
         #Print finish after the simulation
         print("FINISHED!")
@@ -114,6 +180,33 @@ def initialize_sim():
         launcher()
 
 ################################################################################
+
+def execute_sims():
+    root = os.getcwd()
+    for simulation in SIMULATION_QUEUE:
+        counter = 0
+        for gz in GZ_LIST:
+            E_SCRIPTS[counter] = ensight_file_setup(simulation.get_name(),
+                                     simulation.get_filepath(), gz[0], gz[1], gz[2])
+            counter += 1
+
+        os.chdir(simulation.get_filepath())
+        run_fluent(simulation.get_name())
+        run_ensight_scripts()
+        os.chdir(root)
+
+################################################################################
+
+def run_ensight_scripts():
+    try:
+        ## FOR EVERY SCRIPT WE JUST MADE, USE IT
+        for i in range(NUM_CASES):
+            ensight_pp(E_SCRIPTS[i])
+            mvFiles(SPEEDS[i])
+    except:
+        print("Aight, the Ensight post process has failed. This may be\n"
+        + "caused by the program pointing to the wrong directory\n"
+        + "when accessing Fluent/Ensight. Please check the path.")
 
 
 def mvFiles(speed):
@@ -144,7 +237,7 @@ def sim_directory_setup(sim_num, scdoc):
 
 ################################################################################
 
-def journal_file_setup(sim_num, file_path):
+def gen_SSJ(sim_num, file_path):
     replace = (("CAM-"+sim_num), sim_num)
     #Store the path of the journal file
     jrnl_path = file_path + "\\" + sim_num + ".JOU"
@@ -157,26 +250,7 @@ def journal_file_setup(sim_num, file_path):
     gen_jrnl.close()
     sim_jrnl.close()
 
-################################################################################
 
-#  getSimInput
-#  IMPORTS: none
-#  EXPORTS: sim_num
-#  PURPOSE: To get the number of the simulation
-def getSimInput():
-    while True:
-        title()
-        print("What is the Study Number for the simulation?")
-        sim_num = input()
-        if len(sim_num) <= 0:
-            print("You didn't enter anything")
-            input()
-        else:
-            #Double check
-            print("You entered: %s \n Is this correct?: [Y/n]" % sim_num)
-            ans = input()
-            if ans.lower()[0] == 'y':
-                return sim_num
 
 ################################################################################
 
@@ -255,7 +329,8 @@ def ensight_file_setup(sim_num, path, dat, cas, speed):
 ################################################################################
 
 def run_fluent(sim_num):
-    command = 'cmd /c ""C:\\Program Files\\ANSYS Inc\\v202\\fluent\\ntbin\\win64\\fluent.exe" 3d -hidden -t%s -wait -meshing -i %s"' % (THREAD_COUNT, sim_num)
+    print("runnning fluent...")
+    command = 'cmd /c ""C:\\Program Files\\ANSYS Inc\\v201\\fluent\\ntbin\\win64\\fluent.exe" 3d -t%s -wait -meshing -i %s"' % (threads, sim_num)
     os.system(command)
 
 ################################################################################
@@ -265,7 +340,8 @@ def run_fluent(sim_num):
 #  EXPORTS: none
 #  PURPOSE: To execute ensight with the generated script
 def ensight_pp(ens_script_path):
-    command = 'cmd /c ""C:\\Program Files\\ANSYS Inc\\v202\CEI\\bin\\ensighticon202.bat" -batch -p %s"' % ens_script_path
+    print("runnning ensight...")
+    command = 'cmd /c ""C:\\Program Files (x86)\\CEI\\bin\\ensighticon201.bat" -batch -p %s"' % ens_script_path
     os.system(command)
 
 ################################################################################
@@ -295,7 +371,7 @@ def title():
     print("/_/   /_/\__,_/\___/_/ /_/\__/   /____/_/_/ /_/ /_/  \n\n")
 
     print(current_version)
-    print("Number of cores: %d \n\n" % threads)
+    print("Number of cores: %d\n───────────────────" % threads)
 
 
 def menu():
@@ -304,5 +380,57 @@ def menu():
     print("    2) Run multiple Sims")
     print("    3) Exit")
     print("")
+
+
+
+
+
+
+################################################################################
+
+#  getSimInput
+#  IMPORTS: none
+#  EXPORTS: sim_num
+#  PURPOSE: To get the number of the simulation
+#def getSimInput():
+#
+#    while True:
+#        title()
+#        print("What is the Study Number for the simulation?")
+#        sim_num = input()
+#        if len(sim_num) <= 0:
+#            print("You didn't enter anything")
+#            input()
+#        else:
+#            #Double check
+#            print("You entered: %s \n Is this correct?: [Y/n]" % sim_num)
+#            ans = input()
+#            if ans.lower()[0] == 'y':
+#                return sim_num
+
+
+class Simulation:
+
+    name = None
+    filepath = None
+    type = None
+
+    def __init__(self, name, filepath, type):
+        self.name = name
+        self.filepath = filepath
+        self.type = type
+
+    def get_name(self):
+        return self.name
+
+    def get_filepath(self):
+        return self.filepath
+
+    def get_type(self):
+        return self.type
+
+    def inner_display():
+        print("wow")
+
 
 main()
