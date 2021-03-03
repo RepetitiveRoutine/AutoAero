@@ -3,6 +3,7 @@ from os import path
 import glob
 import shutil
 import asyncio
+import time
 import multiprocessing
 from pathlib import Path
 import sys
@@ -49,7 +50,7 @@ def main():
 def launcher():
     global threads
     threads = multiprocessing.cpu_count()
-    title()
+    init_title()
     menu()
 
     choice = input()
@@ -70,6 +71,7 @@ def multiple_sim():
     while(check_space_file() == True):
         for file in os.listdir('.'):
             if file.endswith(".scdoc"):
+                ui_multiple_sim(file)
                 create_sims(file)
                 execute_sims()
 
@@ -84,7 +86,6 @@ def check_space_file():
 ################################################################################
 
 def create_sims(file):
-    ui_multiple_sim(file)
     sim_num = file.replace(".scdoc","")
     filepath = sim_directory_setup(sim_num, file)
     choice = input()
@@ -106,7 +107,7 @@ def ui_multiple_sim(file):
     print("Current queue = [", end = "")
 
     for i in range(len(SIMULATION_QUEUE)):
-        print(SIMULATION_QUEUE[i].get_name(), end = "")
+        print(SIMULATION_QUEUE[i].get_name(),  end = ",")
         i += 1
     print("]")
     print("\nFILE FOUND: " + file)
@@ -361,18 +362,43 @@ def search_and_replace(search, replace, gen_file, new_file):
 
 ################################################################################
 
+def init_title():
+    os.system('cls')
+    print()
+    count = 0
+    for line in title_string:
+        for char in line:
+            sys.stdout.write(color.OKGREEN + char)
+            sys.stdout.flush()
+            if(count == 5):
+                time.sleep(0.01)
+                count = 0
+            count += 1
+        print()
+    print()
+    text_scroller(color.ENDC + current_version)
+    text = ("Number of cores: %d\n───────────────────" % threads)
+    text_scroller(text)
+
+
+
 ## Just the title
 def title():
     os.system('cls')
-    print("    ________                 __     _____ _    ")
-    print("   / ____/ /_  _____  ____  / /_   / ___/(_)___ ___ ")
-    print("  / /_  / / / / / _ \/ __ \/ __/   \__ \/ / __ `__ \\")
-    print(" / __/ / / /_/ /  __/ / / / /_    ___/ / / / / / / /")
-    print("/_/   /_/\__,_/\___/_/ /_/\__/   /____/_/_/ /_/ /_/  \n\n")
-
-    print(current_version)
+    print()
+    for line in title_string:
+        print(color.OKGREEN + line)
+    print()
+    print(color.ENDC + current_version)
     print("Number of cores: %d\n───────────────────" % threads)
+    print()
 
+def text_scroller(text):
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(0.001)
+    print()
 
 def menu():
     print("What would you like to do?")
@@ -380,11 +406,6 @@ def menu():
     print("    2) Run multiple Sims")
     print("    3) Exit")
     print("")
-
-
-
-
-
 
 ################################################################################
 
@@ -408,6 +429,11 @@ def menu():
 #            if ans.lower()[0] == 'y':
 #                return sim_num
 
+title_string =  ["   █████  ██    ██ ████████  ██████   █████  ███████ ██████   ██████ ",
+          "  ██   ██ ██    ██    ██    ██    ██ ██   ██ ██      ██   ██ ██    ██",
+          "  ███████ ██    ██    ██    ██    ██ ███████ █████   ██████  ██    ██",
+          "  ██   ██ ██    ██    ██    ██    ██ ██   ██ ██      ██   ██ ██    ██",
+          "  ██   ██  ██████     ██     ██████  ██   ██ ███████ ██   ██  ██████"]
 
 class Simulation:
 
@@ -432,5 +458,14 @@ class Simulation:
     def inner_display():
         print("wow")
 
+class color:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 main()
