@@ -15,7 +15,7 @@ STRAIGHT_JRNL_PATH = "lib\\SS-GEN.jou"
 YAW_JRNL_PATH = "lib\\YAW-GEN.jou"
 ENS_SS_PATH = "lib\\SS-POST.py"
 ENS_YAW_PATH = "lib\\YAW-POST.py"
-FILE_CONTAINING_SIM = "simulations"
+FILE_CONTAINING_SIMS = "simulations"
 threads = 0
 
 #### WORDS THAT MUST BE REPLACED IN THE JOURNAL FILE ####

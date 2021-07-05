@@ -1,2 +1,2 @@
-python3 autoaero.py
+python autoaero.py
 pause
