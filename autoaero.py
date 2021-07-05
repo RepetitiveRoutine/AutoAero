@@ -57,16 +57,16 @@ def launcher():
     choice = input()
 
     if(choice == '1'):
-        ss_sim()
-    elif(choice == '2'):
-        yaw_sim()
-    elif(choice == '3'):
         multiple_sim()
-    elif(choice == '4'):
+        execute_sims()
+    elif(choice == '2'):
+        cleanup()
+        title()
+    elif(choice == '3'):
+        title()
         exit()
     else:
-        print("what?")
-    #testing
+        launcher()
 
 ################################################################################
 
@@ -76,7 +76,7 @@ def multiple_sim():
             if file.endswith(".scdoc"):
                 ui_multiple_sim(file)
                 create_sims(file)
-    execute_sims()
+
 
 ###############################################################################
 
@@ -91,20 +91,23 @@ def check_space_file():
 
 def create_sims(file):
     sim_num = file.replace(".scdoc","")
-    filepath = sim_directory_setup(sim_num, file)
-    choice = input().upper()
 
+    filepath = sim_directory_setup(sim_num, file)
+    print("\nIs this file Straight Line or Yaw?")
+    print("[S/Y]: ", end="")
+    choice = input().upper()
     if (choice == 'S'):
-        sim = Simulation(sim_num, filepath, 'S')
+        sim = Simulation(sim_num, filepath, 'S', check_postprocess())
         path_to_journal = gen_SSJ(sim_num, filepath)
         init_ensight(sim_num, filepath)
         SIMULATION_QUEUE.append(sim)
 
     elif (choice == 'Y'):
-        sim = Simulation(sim_num, filepath, 'Y')
+        sim = Simulation(sim_num, filepath, 'Y', check_postprocess())
         path_to_journal = gen_SSJ(sim_num, filepath)
         init_ensight(sim_num, filepath)
         SIMULATION_QUEUE.append(sim)
+
 
 def ui_multiple_sim(file):
     title()
@@ -118,117 +121,69 @@ def ui_multiple_sim(file):
     print("            ", end = "")
     for character in file:
         print("¯", end ="")
-    print("\nIs this file Straight Line or Yaw? [S/Y]")
-
 
 
 ################################################################################
 
-def straight_dir():
-    print()
+## FUNCTION: cleanup
+## PURPOSE: deletes everything in the simulation FOLDERS
+def cleanup():
+    print("Are you sure? This will delete ALL of the contents in the simulation")
+    print("folder.")
+    print("[Y/N]: ", end="")
 
-def yaw_dir():
-    print()
+    if(input().lower() == 'y'):
+        for dir in os.listdir("simulations"):
+            try:
+                shutil.rmtree(os.path.join("simulations",dir))
+            except NotADirectoryError:
+                #Ignores the .keep files
+                pass
+        print("Deleted files successfully.")
+        time.sleep(3)
+
+################################################################################
 
 def init_ensight(sim_num, filepath):
     counter = 0
     for gz in GZ_LIST:
-        E_SCRIPTS[counter] = ensight_file_setup(sim_num, filepath, gz[0], gz[1], gz[2])
+        E_SCRIPTS[counter] = ensight_file_setup(sim_num, filepath, gz[0], gz[1], gz[2], ENS_SS_PATH)
         counter += 1
-
-################################################################################
-
-# sim_directory_setup
-# Creates a root directory for the simulation you are going to run.
-# Returns the filepath.
-def multiple_directory_setup(sim_num, scdoc):
-    filepath = os.path.join(FILE_CONTAINING_SIMS, sim_num)
-    #If file is not already created
-    #TODO: Make program exit if file exists [Avoid overwrites]
-    if not os.path.exists(filepath):
-        os.makedirs(filepath)
-
-    for speed in SPEEDS:
-        os.makedirs(filepath + "\\PostProcessing" + speed)
-
-    Path(scdoc).rename(filepath + "\\" + scdoc)
-    return filepath
 
 ##################################################################################
 
+## FUNCTION: populate_postprocess_scripts
+## PURPOSE: Generate 3 post processing scripts for each speed
+def populate_postprocess_scripts(simulation, ens_path):
+    counter = 0
+    for gz in GZ_LIST:
+        E_SCRIPTS[counter] = ensight_file_setup(simulation.get_name(),
+                                 simulation.get_filepath(), gz[0], gz[1], gz[2], ens_path)
+        counter += 1
 
-def yaw_sim():
-
-    scdoc = select_space_file()
-    if(scdoc != None):
-        sim_num = scdoc.replace(".scdoc","")
-        path = sim_directory_setup(sim_num, scdoc)
-        path_to_journal = gen_YJ(sim_num, path)
-
-        ## THIS IS DONE BEFORE OS.CHDIR SO THAT THE PROGRAM DOES NOT
-        ## LOSE TRACK OF THE GENERIC PYTHON SCRIPT
-        counter = 0
-        for gz in GZ_LIST:
-            E_SCRIPTS[counter] = ensight_file_setup(sim_num, path, gz[0], gz[1], gz[2], ENS_YAW_PATH)
-            counter += 1
-
-        #CD into the new directory
-        os.chdir(path)
-        print(os.listdir("."))
-        run_fluent(sim_num)
-        run_ensight_scripts()
-
-        #Print finish after the simulation
-        print("FINISHED!")
-        input()
-
-    else:
-        launcher()
-
-################################################################################
-
-def ss_sim():
-
-    scdoc = select_space_file()
-    if(scdoc != None):
-        sim_num = scdoc.replace(".scdoc","")
-        path = sim_directory_setup(sim_num, scdoc)
-        path_to_journal = gen_SSJ(sim_num, path)
-
-        ## THIS IS DONE BEFORE OS.CHDIR SO THAT THE PROGRAM DOES NOT
-        ## LOSE TRACK OF THE GENERIC PYTHON SCRIPT
-        counter = 0
-        for gz in GZ_LIST:
-            E_SCRIPTS[counter] = ensight_file_setup(sim_num, path, gz[0], gz[1], gz[2], ENS_SS_PATH)
-            counter += 1
-
-        #CD into the new directory
-        os.chdir(path)
-        print(os.listdir("."))
-        run_fluent(sim_num)
-        run_ensight_scripts()
-
-        #Print finish after the simulation
-        print("FINISHED!")
-        input()
-
-    else:
-        launcher()
+## FUNCTION: get_ens_from_type
+## PURPOSE: Returns the ensight script filepath that corresponds to the
+##          type of sim (yaw script for yaw, sl script for sl)
+def get_ens_from_type(simulation):
+    if(simulation.get_type() == 'S'):
+        return ENS_SS_PATH
+    elif(simulation.get_type() == 'Y'):
+        return ENS_YAW_PATH
 
 ###############################################################################
 
 def execute_sims():
     root = os.getcwd()
     for simulation in SIMULATION_QUEUE:
-        counter = 0
-        for gz in GZ_LIST:
-            E_SCRIPTS[counter] = ensight_file_setup(simulation.get_name(),
-                                     simulation.get_filepath(), gz[0], gz[1], gz[2])
-            counter += 1
-
+        ens_path = get_ens_from_type(simulation)
+        populate_postprocess_scripts(simulation, ens_path)
         os.chdir(simulation.get_filepath())
         run_fluent(simulation.get_name())
-        run_ensight_scripts()
+
+        #If the simulation wants to be post processed
+        if(simulation.get_postprocess()):
+            run_ensight_scripts()
+
         os.chdir(root)
 
 ################################################################################
@@ -262,13 +217,16 @@ def sim_directory_setup(sim_num, scdoc):
     filepath = os.path.join(FILE_CONTAINING_SIMS, sim_num)
     #If file is not already created
     #TODO: Make program exit if file exists [Avoid overwrites]
-    if not os.path.exists(filepath):
+    try:
         os.makedirs(filepath)
+        for speed in SPEEDS:
+            os.makedirs(filepath + "\\PostProcessing" + speed)
+        Path(scdoc).rename(filepath + "\\" + scdoc)
+    except FileExistsError:
+        print(color.FAIL + "\nERROR: Simulation already exists!")
+        print(sim_num + " will not be simulated. Delete the file and try again." +color.ENDC)
+        exit()
 
-    for speed in SPEEDS:
-        os.makedirs(filepath + "\\PostProcessing" + speed)
-
-    Path(scdoc).rename(filepath + "\\" + scdoc)
     return filepath
 
 ################################################################################
@@ -376,6 +334,10 @@ def ensight_file_setup(sim_num, path, dat, cas, speed, ens_path):
 
 ################################################################################
 
+#  FUNCTION: run_fluent
+#  IMPORTS: the sims name
+#  EXPORTS: none
+#  PURPOSE: Executes fluent
 def run_fluent(sim_num):
     print("runnning fluent...")
     command = 'cmd /c ""C:\\Program Files\\ANSYS Inc\\v201\\fluent\\ntbin\\win64\\fluent.exe" 3d -t%s -wait -meshing -i %s"' % (threads, sim_num)
@@ -447,12 +409,27 @@ def text_scroller(text):
         time.sleep(0.001)
     print()
 
+
+
+## FUNCTION: check_postprocess
+## PURPOSE: Returns true if the user wants to post process, false otherwise
+def check_postprocess():
+    print("Do you want this sim to be postprocessed?")
+    print("[Y/N]: ", end="")
+    choice = input().lower()
+
+    if(choice == 'y'):
+        return True
+    elif(choice == 'n'):
+        return False
+
+
+
 def menu():
     print("What would you like to do?")
-    print("    1) Run SS")
-    print("    2) Run YAW")
-    print("    3) Run multiple sims")
-    print("    4) Exit")
+    print("    1) Run a simulation[s]")
+    print("    2) Cleanup files")
+    print("    3) Exit")
     print("")
 
 ################################################################################
@@ -488,11 +465,13 @@ class Simulation:
     name = None
     filepath = None
     type = None
+    postprocess = None
 
-    def __init__(self, name, filepath, type):
+    def __init__(self, name, filepath, type, postprocess):
         self.name = name
         self.filepath = filepath
         self.type = type
+        self.postprocess = postprocess
 
     def get_name(self):
         return self.name
@@ -502,6 +481,9 @@ class Simulation:
 
     def get_type(self):
         return self.type
+
+    def get_postprocess(self):
+        return self.postprocess
 
     def inner_display():
         print("wow")
