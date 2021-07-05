@@ -10,11 +10,12 @@ import sys
 
 current_version = "Version 1.5"
 
-#### PATH TO ALL THE GENERIC FILES AND THE STUDY FOLDERS LOCATION ####
+#### PATH TO ALL THE GENERIC FILES AND THE SIMULATIONS FOLDERS LOCATION ####
 STRAIGHT_JRNL_PATH = "lib\\SS-GEN.jou"
-YAW_JRNL_PATH = "lib\\yaw.JOU"
-GEN_ENS_PATH = "lib\\SS-POST.py"
-FILE_CONTAINING_STUDY = "study"
+YAW_JRNL_PATH = "lib\\YAW-GEN.jou"
+ENS_SS_PATH = "lib\\SS-POST.py"
+ENS_YAW_PATH = "lib\\YAW-POST.py"
+FILE_CONTAINING_SIM = "simulations"
 threads = 0
 
 #### WORDS THAT MUST BE REPLACED IN THE JOURNAL FILE ####
@@ -56,10 +57,12 @@ def launcher():
     choice = input()
 
     if(choice == '1'):
-        initialize_sim()
+        ss_sim()
     elif(choice == '2'):
-        multiple_sim()
+        yaw_sim()
     elif(choice == '3'):
+        multiple_sim()
+    elif(choice == '4'):
         exit()
     else:
         print("what?")
@@ -73,8 +76,9 @@ def multiple_sim():
             if file.endswith(".scdoc"):
                 ui_multiple_sim(file)
                 create_sims(file)
-                execute_sims()
+    execute_sims()
 
+###############################################################################
 
 def check_space_file():
     scdocs = []
@@ -88,7 +92,7 @@ def check_space_file():
 def create_sims(file):
     sim_num = file.replace(".scdoc","")
     filepath = sim_directory_setup(sim_num, file)
-    choice = input()
+    choice = input().upper()
 
     if (choice == 'S'):
         sim = Simulation(sim_num, filepath, 'S')
@@ -138,7 +142,7 @@ def init_ensight(sim_num, filepath):
 # Creates a root directory for the simulation you are going to run.
 # Returns the filepath.
 def multiple_directory_setup(sim_num, scdoc):
-    filepath = os.path.join(FILE_CONTAINING_STUDY, sim_num)
+    filepath = os.path.join(FILE_CONTAINING_SIMS, sim_num)
     #If file is not already created
     #TODO: Make program exit if file exists [Avoid overwrites]
     if not os.path.exists(filepath):
@@ -150,21 +154,22 @@ def multiple_directory_setup(sim_num, scdoc):
     Path(scdoc).rename(filepath + "\\" + scdoc)
     return filepath
 
-################################################################################
+##################################################################################
 
-def initialize_sim():
+
+def yaw_sim():
 
     scdoc = select_space_file()
     if(scdoc != None):
         sim_num = scdoc.replace(".scdoc","")
         path = sim_directory_setup(sim_num, scdoc)
-        path_to_journal = gen_SSJ(sim_num, path)
+        path_to_journal = gen_YJ(sim_num, path)
 
         ## THIS IS DONE BEFORE OS.CHDIR SO THAT THE PROGRAM DOES NOT
         ## LOSE TRACK OF THE GENERIC PYTHON SCRIPT
         counter = 0
         for gz in GZ_LIST:
-            E_SCRIPTS[counter] = ensight_file_setup(sim_num, path, gz[0], gz[1], gz[2])
+            E_SCRIPTS[counter] = ensight_file_setup(sim_num, path, gz[0], gz[1], gz[2], ENS_YAW_PATH)
             counter += 1
 
         #CD into the new directory
@@ -181,6 +186,36 @@ def initialize_sim():
         launcher()
 
 ################################################################################
+
+def ss_sim():
+
+    scdoc = select_space_file()
+    if(scdoc != None):
+        sim_num = scdoc.replace(".scdoc","")
+        path = sim_directory_setup(sim_num, scdoc)
+        path_to_journal = gen_SSJ(sim_num, path)
+
+        ## THIS IS DONE BEFORE OS.CHDIR SO THAT THE PROGRAM DOES NOT
+        ## LOSE TRACK OF THE GENERIC PYTHON SCRIPT
+        counter = 0
+        for gz in GZ_LIST:
+            E_SCRIPTS[counter] = ensight_file_setup(sim_num, path, gz[0], gz[1], gz[2], ENS_SS_PATH)
+            counter += 1
+
+        #CD into the new directory
+        os.chdir(path)
+        print(os.listdir("."))
+        run_fluent(sim_num)
+        run_ensight_scripts()
+
+        #Print finish after the simulation
+        print("FINISHED!")
+        input()
+
+    else:
+        launcher()
+
+###############################################################################
 
 def execute_sims():
     root = os.getcwd()
@@ -224,7 +259,7 @@ def mvFiles(speed):
 # Creates a root directory for the simulation you are going to run.
 # Returns the filepath.
 def sim_directory_setup(sim_num, scdoc):
-    filepath = os.path.join(FILE_CONTAINING_STUDY, sim_num)
+    filepath = os.path.join(FILE_CONTAINING_SIMS, sim_num)
     #If file is not already created
     #TODO: Make program exit if file exists [Avoid overwrites]
     if not os.path.exists(filepath):
@@ -239,7 +274,7 @@ def sim_directory_setup(sim_num, scdoc):
 ################################################################################
 
 def gen_SSJ(sim_num, file_path):
-    replace = (("CAM-"+sim_num), sim_num)
+    replace = (sim_num, sim_num)
     #Store the path of the journal file
     jrnl_path = file_path + "\\" + sim_num + ".JOU"
     ## FILE CREATION ##
@@ -251,9 +286,21 @@ def gen_SSJ(sim_num, file_path):
     gen_jrnl.close()
     sim_jrnl.close()
 
-
-
 ################################################################################
+
+def gen_YJ(sim_num, file_path):
+    replace = (sim_num, sim_num)
+    #Store the path of the journal file
+    jrnl_path = file_path + "\\" + sim_num + ".JOU"
+    ## FILE CREATION ##
+    sim_jrnl = open(jrnl_path, "w+")
+    #Open the generic journal
+    gen_jrnl = open(YAW_JRNL_PATH)
+    #SEARCH AND REPLACE#
+    search_and_replace(J_SEARCH, replace, gen_jrnl, sim_jrnl)
+    gen_jrnl.close()
+    sim_jrnl.close()
+
 
 def select_space_file():
     scdocs = []
@@ -301,9 +348,9 @@ def space_printer(scdocs, print_text):
 # EXPORTS: The location of the new ensight script
 # Creates the files required for ensight,
 # Does a search and replace on the gen script
-def ensight_file_setup(sim_num, path, dat, cas, speed):
+def ensight_file_setup(sim_num, path, dat, cas, speed, ens_path):
     script_path = path + "\\PPScript" + speed + ".py"
-    gen_script = open(GEN_ENS_PATH)
+    gen_script = open(ens_path)
     ens_script = open(script_path,"w+")
     root_path = os.getcwd()
 
@@ -342,7 +389,7 @@ def run_fluent(sim_num):
 #  PURPOSE: To execute ensight with the generated script
 def ensight_pp(ens_script_path):
     print("runnning ensight...")
-    command = 'cmd /c ""C:\\Program Files (x86)\\CEI\\bin\\ensighticon201.bat" -batch -p %s"' % ens_script_path
+    command = 'cmd /c ""C:\\Program Files\\ANSYS Inc\\v201\\CEI\\bin\\ensighticon201.bat" -batch -p %s"' % ens_script_path
     os.system(command)
 
 ################################################################################
@@ -402,9 +449,10 @@ def text_scroller(text):
 
 def menu():
     print("What would you like to do?")
-    print("    1) Run a sim")
-    print("    2) Run multiple Sims")
-    print("    3) Exit")
+    print("    1) Run SS")
+    print("    2) Run YAW")
+    print("    3) Run multiple sims")
+    print("    4) Exit")
     print("")
 
 ################################################################################

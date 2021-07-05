@@ -1,14 +1,23 @@
 #-------------CMT ENSIGHT POST PROCESSING SCRIPT
 #------PURPOSE: Generates report template of Fluent Simulation for post processing
 #------AUTHER: Arie Van Grootel
-#------CREATED: ???
-#------HOWTO: Insert description of how to use the cmd stuff
+#------CREATED: Good question (late 2020)
+#------HOWTO: For manual use if not using AutoAero process (you should use autoaero)
+#
+#------------- Copy this script into your sim folder, open this script and change the ensight data result and data replace locations with the location case (somewhere around row 40). Replace two locations.
+#------------- Replace the location that the report server will generate to and launch from with the file location of sim (somewhere around row 960). Replace two locations.
+#------------- Replace the sim name with sim case name and speed (should be somewhere around row 158). Replace one name.
+#------------- Type ensight program location in cmd, add " -p " and then the location of this script. Ensight will run and input this script and report will generate in 15-25min.
+#
 #------CHANGELOG: 
 #------ 2021/02/26
 #------ increased number of clip planes
+#------ 2021/03/21 
+#------ inserted descriptions and how to, doubled clip plane amounts. 
 #--------TO DO:
-#------ 
+#------ Change part selects to part name rather than number
 
+# General Ensight setup
 ensight.part.select_default()
 ensight.part.modify_begin()
 ensight.part.elt_representation("3D_border_2D_full")
@@ -28,10 +37,16 @@ ensight.data.reader_option("'Use Zone IDs for Parts' OFF")
 ensight.data.reader_option("'Read all files to create variable list' OFF")
 ensight.data.reader_option("'Console Output' 'Normal'")
 ensight.data.reader_option("'Time Values' 'Read Time Values'")
+
+# This is where the sim data is pulled from. Replace these two locations with the location of selected case.
+ 
 ensight.data.result(r"""PATHTODAT""")
 ensight.data.shift_time(1.000000,0.000000,0.000000)
 ensight.solution_time.monitor_for_new_steps("off")
 ensight.data.replace(r"""PATHTOCAS""")
+
+# Activate required variables, generate symmetry model, import standarised views from directory.
+
 ensight.part.select_begin(2)
 ensight.part.visible("OFF")
 ensight.part.select_begin(22)
@@ -67,6 +82,9 @@ ensight.view_transf.function("global")
 ensight.views.use_stored_image("OFF")
 ensight.views.rescale_views("ON")
 ensight.views.load_dir("J:/SAE/CMT/2. Aero/Ensight/Ensight Home/Views")
+
+# Begin vorticity sweep state
+
 ensight.part.select_begin(1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,28,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48)
 ensight.part.colorby_palette("none")
 ensight.part.colorby_rgb(0.6,0.6,0.6)
@@ -146,8 +164,14 @@ ensight.objs.core.STATES[0].CHILDREN['Vorticity sweep'][0].move(ensight.objs.cor
 ensight.objs.core.STATES[0].CREATE_REPORT_TEMPLATE=True
 ensight.objs.core.STATES[0].USE_LOGO=True
 ensight.objs.core.STATES[0].set_logo_file('J:/SAE/CMT/2. Aero/Ensight/Ensight Home/CMT Report logo.PNG')
+
+# Replace report name below with sim case and speed
+
 ensight.objs.core.STATES[0].TEMPLATE_NAME='solved-16.67MS'
 ensight.objs.core.STATES[0].CHILDREN['Vorticity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.1, 'P1': -3.0, 'nc': 50, 'use_export_dialog': 0, 'width': 1493, 'height': 1015, 'AA': 1, 'var': ['Vorticity_Magnitude'], 'parts': ['Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
+
+# Begin side velocity sweep
+
 ensight.part.select_begin(1,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,28,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48)
 ensight.part.select_begin(1)
 ensight.part.visible("OFF")
@@ -952,7 +976,9 @@ ensight.view_transf.rotate(0,0,-2.00751805)
 ensight.objs.core.STATES[0].CHILDREN['Geometry'][0].apply()
 ensight.objs.core.STATES[0].CHILDREN['Top streamlines with pressure'][0].apply()
 ensight.part.select_begin(58)
-##########################################################################
+
+# Generating report, creating database and server. Replace both locations here with sim case folder location. 
+
 ensight.core.nexus.ReportServer.create_local_database(r"""SIM_DIRECTORY""")
 ensight.core.nexus.ReportServer.launch_local_server(r"""SIM_DIRECTORY""",port=None,connect=ensight.core.nexus.ReportServer.get_server(),terminate_on_python_exit=True)
 ensight.core.nexus.ReportServer.get_server().set_username('nexus')
@@ -982,7 +1008,7 @@ ensight.objs.core.STATES[0].USE_LOGO=True
 ensight.objs.core.STATES[0].CHILDREN['Vorticity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.0, 'P1': -3.0, 'nc': 2, 'use_export_dialog': 0, 'width': 1478, 'height': 1015, 'AA': 1, 'var': ['Vorticity_Magnitude'], 'parts': ['Vorticity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
 ensight.objs.core.STATES[0].CREATE_REPORT_TEMPLATE=True
 ensight.objs.core.STATES[0].USE_LOGO=True
-ensight.objs.core.STATES[0].CHILDREN['Vorticity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.0, 'P1': -3.0, 'nc': 40, 'use_export_dialog': 0, 'width': 1478, 'height': 1015, 'AA': 1, 'var': ['Vorticity_Magnitude'], 'parts': ['Vorticity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
+ensight.objs.core.STATES[0].CHILDREN['Vorticity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.0, 'P1': -3.0, 'nc': 80, 'use_export_dialog': 0, 'width': 1478, 'height': 1015, 'AA': 1, 'var': ['Vorticity_Magnitude'], 'parts': ['Vorticity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
 ensight.objs.core.STATES[0].update_tags('',new_session=False,random_session=False)
 ensight.objs.core.STATES[0].generate_report()
 ensight.objs.core.STATES[0].CHILDREN['Geometry'][0].apply()
@@ -993,10 +1019,10 @@ ensight.views.apply()
 ensight.objs.core.STATES[0].CHILDREN['Geometry'][0].capture()
 ensight.objs.core.STATES[0].CREATE_REPORT_TEMPLATE=True
 ensight.objs.core.STATES[0].USE_LOGO=True
-ensight.objs.core.STATES[0].CHILDREN['Side velocity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.0, 'P1': -1.0, 'nc': 40, 'use_export_dialog': 0, 'width': 1493, 'height': 1015, 'AA': 1, 'var': ['VELOCITY[]'], 'parts': ['Side velocity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
+ensight.objs.core.STATES[0].CHILDREN['Side velocity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 1.0, 'P1': -1.0, 'nc': 80, 'use_export_dialog': 0, 'width': 1493, 'height': 1015, 'AA': 1, 'var': ['VELOCITY[]'], 'parts': ['Side velocity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
 ensight.objs.core.STATES[0].CREATE_REPORT_TEMPLATE=True
 ensight.objs.core.STATES[0].USE_LOGO=True
-ensight.objs.core.STATES[0].CHILDREN['Vertical velocity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 0.0, 'P1': 1.3, 'nc': 30, 'use_export_dialog': 0, 'width': 1493, 'height': 1015, 'AA': 1, 'var': ['VELOCITY[]'], 'parts': ['Vertical velocity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
+ensight.objs.core.STATES[0].CHILDREN['Vertical velocity sweep'][0].CHILDREN['Sweep Source'][0].SOURCE.set_params({'P0': 0.0, 'P1': 1.3, 'nc': 60, 'use_export_dialog': 0, 'width': 1493, 'height': 1015, 'AA': 1, 'var': ['VELOCITY[]'], 'parts': ['Vertical velocity Clip_plane'], 'rotate_count': 1, 'rotate_axis': 0, 'transient': 0})
 ensight.objs.core.STATES[0].update_tags('',new_session=False,random_session=False)
 ensight.objs.core.STATES[0].generate_report()
 ensight.objs.core.STATES[0].CHILDREN['Geometry'][0].apply()
